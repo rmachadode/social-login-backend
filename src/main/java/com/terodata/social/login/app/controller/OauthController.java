@@ -61,18 +61,24 @@ public class OauthController {
 	@PostMapping("/google")
 	public ResponseEntity<TokenDto> google(@RequestBody TokenDto tokenDto) throws IOException {
 		final NetHttpTransport transport = new NetHttpTransport();
-		final JacksonFactory jacksonFactory = JacksonFactory.getDefaultInstance();
-		//Verifico el token recibido con la api de Google para ver si es valido
-		GoogleIdTokenVerifier.Builder verifier = new GoogleIdTokenVerifier.Builder(transport, jacksonFactory)
-				.setAudience(Collections.singletonList(googleClientId));
-		final GoogleIdToken googleIdToken = GoogleIdToken.parse(verifier.getJsonFactory(), tokenDto.getValue());
-		final GoogleIdToken.Payload payload = googleIdToken.getPayload();
-		//Verifico si existe el usuario, sino se crea
-		User user = userService.findByEmail(payload.getEmail()).orElse(null);
-		if (user == null) {
-			user = createUser(payload.getEmail());
+		User user = null;
+		try {
+			final JacksonFactory jacksonFactory = JacksonFactory.getDefaultInstance();
+			// Verifico el token recibido con la api de Google para ver si es valido
+			GoogleIdTokenVerifier.Builder verifier = new GoogleIdTokenVerifier.Builder(transport, jacksonFactory)
+					.setAudience(Collections.singletonList(googleClientId));
+			final GoogleIdToken googleIdToken = GoogleIdToken.parse(verifier.getJsonFactory(), tokenDto.getValue());
+			final GoogleIdToken.Payload payload = googleIdToken.getPayload();
+			// Verifico si existe el usuario, sino se crea
+			user = userService.findByEmail(payload.getEmail()).orElse(null);
+			if (user == null) {
+				user = createUser(payload.getEmail());
+			}
+		} catch (Exception e) {
+			return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
 		}
-		//Se realiza la authenticacion del usuario
+
+		// Se realiza la authenticacion del usuario
 		TokenDto tokenRes = login(user);
 		return new ResponseEntity<>(tokenRes, HttpStatus.OK);
 	}
@@ -86,14 +92,14 @@ public class OauthController {
 		tokenDto.setValue(jwt);
 		return tokenDto;
 	}
-	
-	private User createUser(String email){
-        User user = new User(email, passwordEncoder.encode(secretPsw));
-        Role roleUser = roleService.findByName(RoleNames.ROLE_USER.name()).orElse(null);
-        Set<Role> roles = new HashSet<>();
-        roles.add(roleUser);
-        user.setRoles(roles);
-        return userService.save(user);
-    }
+
+	private User createUser(String email) {
+		User user = new User(email, passwordEncoder.encode(secretPsw));
+		Role roleUser = roleService.findByName(RoleNames.ROLE_USER.name()).orElse(null);
+		Set<Role> roles = new HashSet<>();
+		roles.add(roleUser);
+		user.setRoles(roles);
+		return userService.save(user);
+	}
 
 }
