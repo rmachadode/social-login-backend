@@ -14,6 +14,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.social.facebook.api.Facebook;
+import org.springframework.social.facebook.api.impl.FacebookTemplate;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -79,6 +81,26 @@ public class OauthController {
 		}
 
 		// Se realiza la authenticacion del usuario
+		TokenDto tokenRes = login(user);
+		return new ResponseEntity<>(tokenRes, HttpStatus.OK);
+	}
+
+	@PostMapping("/facebook")
+	public ResponseEntity<TokenDto> facebook(@RequestBody TokenDto tokenDto) throws IOException {
+		User user = null;
+		try {
+			Facebook facebook = new FacebookTemplate(tokenDto.getValue());
+			final String[] fields = { "email", "picture" };
+			org.springframework.social.facebook.api.User userFace = facebook.fetchObject("me",
+					org.springframework.social.facebook.api.User.class, fields);
+			// Verifico si existe el usuario, sino se crea
+			user = userService.findByEmail(userFace.getEmail()).orElse(null);
+			if (user == null) {
+				user = createUser(userFace.getEmail());
+			}
+		} catch (Exception e) {
+			return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+		}
 		TokenDto tokenRes = login(user);
 		return new ResponseEntity<>(tokenRes, HttpStatus.OK);
 	}
