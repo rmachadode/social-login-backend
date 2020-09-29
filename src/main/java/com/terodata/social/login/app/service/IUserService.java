@@ -1,5 +1,6 @@
 package com.terodata.social.login.app.service;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.terodata.social.login.app.entity.User;
@@ -11,4 +12,6 @@ public interface IUserService {
 	boolean existsEmail(String email);
 
 	User save(User user);
+	
+	List<User> getAll();
 }

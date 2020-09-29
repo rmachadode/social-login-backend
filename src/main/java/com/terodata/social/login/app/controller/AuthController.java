@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,6 +27,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
+import com.terodata.social.login.app.dto.AuthenticationRequest;
 import com.terodata.social.login.app.dto.TokenDto;
 import com.terodata.social.login.app.entity.Role;
 import com.terodata.social.login.app.entity.User;
@@ -35,9 +37,9 @@ import com.terodata.social.login.app.service.IRoleService;
 import com.terodata.social.login.app.service.IUserService;
 
 @RestController
-@RequestMapping("/oauth")
+@RequestMapping("/auth")
 @CrossOrigin
-public class OauthController {
+public class AuthController {
 
 	@Value("${google.clientId}")
 	String googleClientId;
@@ -81,7 +83,7 @@ public class OauthController {
 		}
 
 		// Se realiza la authenticacion del usuario
-		TokenDto tokenRes = login(user);
+		TokenDto tokenRes = login(user, secretPsw);
 		return new ResponseEntity<>(tokenRes, HttpStatus.OK);
 	}
 
@@ -101,13 +103,13 @@ public class OauthController {
 		} catch (Exception e) {
 			return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
 		}
-		TokenDto tokenRes = login(user);
+		TokenDto tokenRes = login(user, secretPsw);
 		return new ResponseEntity<>(tokenRes, HttpStatus.OK);
 	}
 
-	private TokenDto login(User user) {
+	private TokenDto login(User user, String password) {
 		Authentication authentication = authenticationManager
-				.authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), secretPsw));
+				.authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), password));
 		SecurityContextHolder.getContext().setAuthentication(authentication);
 		String jwt = jwtProvider.generateToken(authentication);
 		TokenDto tokenDto = new TokenDto();
@@ -122,6 +124,32 @@ public class OauthController {
 		roles.add(roleUser);
 		user.setRoles(roles);
 		return userService.save(user);
+	}
+	
+	@PostMapping("/login")
+	public ResponseEntity<Object> createToken(@RequestBody AuthenticationRequest request){
+		User user = null;
+		try {
+			user = userService.findByEmail(request.getUsername()).orElse(null);
+			if(user == null) {
+				return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+			}
+			TokenDto tokenRes = login(user, request.getPassword());
+			return new ResponseEntity<>(tokenRes, HttpStatus.OK);
+		} catch (BadCredentialsException e) {
+			return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+		}
+	}
+	
+	@PostMapping("/signup")
+	public ResponseEntity<?> create(@RequestBody User user) {
+		User savedUser = null;
+		try {
+			savedUser = userService.save(user);
+		} catch (Exception e) {
+			return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+		}
+		return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
 	}
 
 }
